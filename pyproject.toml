@@ -1,0 +1,91 @@
+[project]
+name = "unmix"
+version = "0.1.0"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+    "audio-separator[gpu]>=0.44.1",
+    "httpx>=0.28.1",
+    "lightning-fabric>=2.6.1",
+    "numpy>=2.2.6",
+    "pyannote-audio[separation]>=4.0.4",
+    "pyannote-core>=6.0.1",
+    "scipy>=1.15.3",
+    "soundfile>=0.13.1",
+    "speechbrain>=1.1.0",
+    "torch",
+    "torchaudio",
+    "torchvision",
+]
+
+[dependency-groups]
+dev = [
+    {include-group = "lint"},
+    {include-group = "test"},
+    "scipy-stubs>=1.17.1.4",
+]
+lint = [
+    "ruff>=0.4",
+    "mypy>=1.10",
+]
+test = [
+    "pytest>=8.0",
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+exclude = ["tests/"]
+
+[[tool.mypy.overrides]]
+module = [
+    "audio_separator.*",
+    "pyannote.*",
+    "speechbrain.*",
+    "soundfile.*",
+    "lightning_fabric.*",
+]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 120
+exclude = [
+    ".venv/*",
+    "tests/*",
+]
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`) and pycodestyle (`E`, `W`) codes by default.
+# Also enable isort (`I`) for import sorting.
+select = ["E", "F", "W", "I", "B", "Q", "D","G"]
+
+# Ignore line length violations (E501).
+ignore = ["B008", "B904", "D203", "D212", "E711", "G004"]
+
+per-file-ignores = {}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+python_files = ["test_*.py", "*_test.py"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+addopts = "--cov=backend --cov-report=term-missing --cov-fail-under=70"
+filterwarnings = [
+    "ignore::DeprecationWarning:passlib.*",
+]
+
+[tool.coverage.run]
+omit = ["backend/db_init/*"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["backend"]
