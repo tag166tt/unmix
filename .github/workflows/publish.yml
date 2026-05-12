@@ -1,0 +1,39 @@
+name: Build and Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-n-publish:
+    name: Build and publish Python distribution to GitHub Packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install dependencies
+      run: uv sync
+
+    - name: Fetch latest data
+      run: uv run download-plutonium-data
+
+    - name: Build distribution
+      run: uv build
+
+    - name: Publish to Nexus
+      env:
+        UV_PUBLISH_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+        UV_PUBLISH_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+      run: |
+        uv publish --publish-url https://nexus.ythevalil.com/repository/pypi/
