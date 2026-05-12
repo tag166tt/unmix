@@ -32,5 +32,6 @@ jobs:
       env:
         UV_PUBLISH_USERNAME: ${{ secrets.NEXUS_USERNAME }}
         UV_PUBLISH_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        UV_PUBLISH_URL: ${{ secrets.NEXUS_PUBLISH_URL }}
       run: |
-        uv publish --publish-url https://nexus.ythevalil.com/repository/pypi/
+        uv publish --publish-url $UV_PUBLISH_URL
