@@ -136,7 +136,7 @@ def separate_speakers(
     """
     pipeline = Pipeline.from_pretrained(
         "pyannote/speaker-diarization-3.1",
-        token=token,
+        # token=token,
     )
     pipeline.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))  # type: ignore[union-attr]
 
@@ -216,7 +216,7 @@ def separate_overlapping_speakers(
     """
     pipeline = Pipeline.from_pretrained(
         "pyannote/speech-separation-ami-1.0",
-        token=token,
+        # token=token,
     )
     pipeline.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))  # type: ignore[union-attr]
 
