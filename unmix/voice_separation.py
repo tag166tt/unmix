@@ -4,7 +4,10 @@ import functools
 import importlib.util
 import inspect
 from itertools import combinations
+import logging
 from pathlib import Path
+import re
+import sys
 from typing import Literal
 
 import numpy as np
@@ -13,6 +16,8 @@ import torchaudio  # type: ignore[import-untyped]
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 from pyannote.core import Annotation, Segment, Timeline
+
+logger = logging.getLogger(__name__)
 
 _orig_torch_load = torch.load
 
@@ -36,7 +41,6 @@ def _patch_speechbrain_interfaces() -> None:
         ('"cuda" in self.device', '"cuda" in str(self.device)'),
         ("self.device.split(", "str(self.device).split("),
         ('self.device = run_opts["device"]', 'self.device = str(run_opts["device"])'),
-        ('self.device = run_opts.get("device"', 'self.device = str(run_opts.get("device"'),
         ('if self.device == "cpu":', 'if str(self.device) == "cpu":'),
         (
             'device_type=getattr(self, "device_type", str(self.device).split(":")[0]),',
@@ -48,18 +52,33 @@ def _patch_speechbrain_interfaces() -> None:
         if old in text:
             text = text.replace(old, new)
             changed = True
-            print(f"[patch] Applied: {old!r}")
+            logger.info(f"[patch] Applied: {old!r}")
+    new_text, n = re.subn(
+        r'self\.device = (run_opts\.get\("device"[^)]*\))',
+        r'self.device = str(\1)',
+        text,
+    )
+    if n:
+        text = new_text
+        changed = True
+        logger.info('[patch] Applied: run_opts.get("device") → str(...)')
     if changed:
         path.write_text(text)
         cache_path = Path(importlib.util.cache_from_source(str(path)))
         if cache_path.exists():
             cache_path.unlink()
-            print("[patch] Removed stale .pyc cache")
+            logger.info("[patch] Removed stale .pyc cache")
 
 
 _patch_speechbrain_interfaces()
 
-from speechbrain.inference.interfaces import Pretrained
+# Reload so the file patches apply to the already-running process
+_sbi = sys.modules.get("speechbrain.inference.interfaces")
+if _sbi is not None:
+    importlib.reload(_sbi)
+
+# Re-bind Pretrained from the (possibly reloaded) module
+from speechbrain.inference.interfaces import Pretrained  # noqa: F811
 
 _orig_pretrained_init = Pretrained.__init__
 _valid_pretrained_params = set(inspect.signature(_orig_pretrained_init).parameters.keys())
@@ -140,7 +159,7 @@ def separate_speakers(
     total_samples = waveform.shape[1]
     overlap_samples = overlap_mask.sum().item()
     overlap_pct = 100 * overlap_samples / total_samples
-    print(f"Overlap: {overlap_pct:.1f}% of audio ({len(overlap_segments)} regions)")
+    logger.info(f"Overlap: {overlap_pct:.1f}% of audio ({len(overlap_segments)} regions)")
 
     speaker_audio = {spk: torch.zeros_like(waveform) for spk in diarization.labels()}
 
@@ -160,7 +179,7 @@ def separate_speakers(
     for speaker, audio in speaker_audio.items():
         out_path = output_dir / f"{speaker}.wav"
         torchaudio.save(str(out_path), audio, sr)
-        print(f"Saved {speaker} → {out_path}")
+        logger.info(f"Saved {speaker} → {out_path}")
         output_files[speaker] = str(out_path)
 
     if overlap_strategy == "separate" and overlap_samples > 0:
@@ -168,7 +187,7 @@ def separate_speakers(
         overlap_audio[:, overlap_mask] = waveform[:, overlap_mask]
         out_path = output_dir / "overlap.wav"
         torchaudio.save(str(out_path), overlap_audio, sr)
-        print(f"Saved overlap → {out_path}")
+        logger.info(f"Saved overlap → {out_path}")
         output_files["overlap"] = str(out_path)
 
     return diarization, output_files
@@ -242,7 +261,7 @@ def separate_overlapping_speakers(
             speaker_audio = waveform_hq * mask_hq
             out_path = output_dir / f"{speaker}_hq.wav"
             torchaudio.save(str(out_path), speaker_audio, sr_hq)
-            print(f"Saved {speaker} (HQ) → {out_path}")
+            logger.info(f"Saved {speaker} (HQ) → {out_path}")
             output_files[speaker] = str(out_path)
 
     else:
@@ -256,7 +275,7 @@ def separate_overlapping_speakers(
             audio_tensor = torch.from_numpy(audio_data).unsqueeze(0)
             out_path = output_dir / f"{speaker}.wav"
             torchaudio.save(str(out_path), audio_tensor, 16000)
-            print(f"Saved {speaker} → {out_path}")
+            logger.info(f"Saved {speaker} → {out_path}")
             output_files[speaker] = str(out_path)
 
     return diarization, output_files
