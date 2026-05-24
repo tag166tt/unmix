@@ -13,7 +13,6 @@ import torchaudio  # type: ignore[import-untyped]
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 from pyannote.core import Annotation, Segment, Timeline
-from speechbrain.inference.interfaces import Pretrained
 
 _orig_torch_load = torch.load
 
@@ -59,6 +58,9 @@ def _patch_speechbrain_interfaces() -> None:
 
 
 _patch_speechbrain_interfaces()
+
+from speechbrain.inference.interfaces import Pretrained
+
 _orig_pretrained_init = Pretrained.__init__
 _valid_pretrained_params = set(inspect.signature(_orig_pretrained_init).parameters.keys())
 
